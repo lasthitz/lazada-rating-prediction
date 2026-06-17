@@ -9,10 +9,10 @@ BASE_DIR = Path(__file__).resolve().parent
 MODEL_PATH = BASE_DIR / "model" / "model_knn_regressor.joblib"
 VECTORIZER_PATH = BASE_DIR / "model" / "tfidf_vectorizer.joblib"
 
-SIDEBAR_EXAMPLES = [
-    ("Contoh Positif", "Barang sangat bagus, kualitas mantap dan sesuai pesanan."),
-    ("Contoh Netral", "Produknya lumayan dan sesuai dengan harga."),
-    ("Contoh Negatif", "Barang rusak, pengiriman lama dan sangat mengecewakan."),
+EXAMPLE_REVIEWS = [
+    "Barang sangat bagus, kualitas mantap dan sesuai pesanan!",
+    "Kualitas kurang bagus, barang biasa saja, pengiriman lama.",
+    "Kualitas sangat buruk, barang rusak, tidak sesuai deskripsi.",
 ]
 
 INTERPRETATION_STYLES = {
@@ -64,33 +64,7 @@ def format_rating(value):
 def rating_stars(value):
     filled_stars = int(round(value))
     filled_stars = max(0, min(5, filled_stars))
-    return "\u2605" * filled_stars + "\u2606" * (5 - filled_stars)
-
-
-def input_quality(word_count):
-    if word_count == 0:
-        return "Input belum tersedia"
-    if word_count <= 2:
-        return "Ulasan terlalu singkat"
-    if word_count <= 5:
-        return "Ulasan cukup singkat"
-    return "Ulasan cukup jelas"
-
-
-def analyze_vocabulary(cleaned_text, vectorizer):
-    words = cleaned_text.split()
-    vocabulary = getattr(vectorizer, "vocabulary_", {})
-    known_count = sum(1 for word in words if word in vocabulary)
-    unknown_words = [word for word in words if word not in vocabulary]
-    unknown_examples = list(dict.fromkeys(unknown_words))[:5]
-    return known_count, len(unknown_words), unknown_examples
-
-
-def truncate_text(text, limit=72):
-    clean_preview = " ".join(str(text).split())
-    if len(clean_preview) <= limit:
-        return clean_preview
-    return f"{clean_preview[: limit - 3]}..."
+    return "★" * filled_stars + "☆" * (5 - filled_stars)
 
 
 def select_example(text):
@@ -105,20 +79,6 @@ def reset_state():
     st.session_state.prediction = None
     st.session_state.interpretation = None
     st.session_state.message = None
-
-
-def add_prediction_history(text, prediction, interpretation):
-    st.session_state.prediction_history.append(
-        {
-            "text": text,
-            "rating": prediction,
-            "interpretation": interpretation,
-        }
-    )
-
-
-def clear_session_history():
-    st.session_state.prediction_history = []
 
 
 st.set_page_config(
@@ -185,99 +145,6 @@ if "interpretation" not in st.session_state:
     st.session_state.interpretation = None
 if "message" not in st.session_state:
     st.session_state.message = None
-if "prediction_history" not in st.session_state:
-    st.session_state.prediction_history = []
-
-current_cleaned_text = clean_text(st.session_state.review_text)
-current_cleaned_words = current_cleaned_text.split()
-
-with st.sidebar:
-    st.title("Panel Analisis Ulasan")
-    st.caption("Ringkasan ini hanya membantu membaca input dan sesi saat ini.")
-
-    st.divider()
-    st.subheader("Analisis Input Saat Ini")
-    st.metric("Jumlah karakter", len(st.session_state.review_text))
-    st.metric("Jumlah kata setelah cleaning", len(current_cleaned_words))
-    st.caption("Preview hasil cleaning")
-    st.code(current_cleaned_text if current_cleaned_text else "-", language="text")
-    st.caption(f"Status kualitas input: {input_quality(len(current_cleaned_words))}")
-
-    st.divider()
-    st.subheader("Keterbacaan Kata")
-    _, sidebar_vectorizer = load_assets()
-    known_count, unknown_count, unknown_examples = analyze_vocabulary(
-        current_cleaned_text,
-        sidebar_vectorizer,
-    )
-    word_metric_columns = st.columns(2)
-    with word_metric_columns[0]:
-        st.metric("Dikenali", known_count)
-    with word_metric_columns[1]:
-        st.metric("Tidak dikenali", unknown_count)
-
-    with st.expander("Contoh kata tidak dikenali", expanded=unknown_count > 0):
-        if unknown_examples:
-            for word in unknown_examples:
-                st.caption(f"- {word}")
-            st.info(
-                'Gunakan kata yang dipisahkan dengan spasi dan kalimat yang lebih jelas. Contoh: tulis "ga suka", bukan "gasuka".'
-            )
-        else:
-            st.caption("Tidak ada kata tidak dikenali untuk input saat ini.")
-
-    st.divider()
-    st.subheader("Contoh Ulasan")
-    for label, example in SIDEBAR_EXAMPLES:
-        st.button(
-            label,
-            on_click=select_example,
-            args=(example,),
-            use_container_width=True,
-        )
-
-    st.divider()
-    st.subheader("Analisis Sesi")
-    history = st.session_state.prediction_history
-    total_predictions = len(history)
-    average_rating = (
-        sum(item["rating"] for item in history) / total_predictions
-        if total_predictions
-        else None
-    )
-    positive_count = sum(1 for item in history if item["interpretation"] == "Positif")
-    neutral_count = sum(1 for item in history if item["interpretation"] == "Netral")
-    negative_count = sum(1 for item in history if item["interpretation"] == "Negatif")
-
-    st.metric("Total prediksi", total_predictions)
-    st.metric(
-        "Rata-rata rating",
-        format_rating(average_rating) if average_rating is not None else "-",
-    )
-
-    session_metric_columns = st.columns(3)
-    with session_metric_columns[0]:
-        st.metric("Positif", positive_count)
-    with session_metric_columns[1]:
-        st.metric("Netral", neutral_count)
-    with session_metric_columns[2]:
-        st.metric("Negatif", negative_count)
-
-    with st.expander("Riwayat prediksi terakhir", expanded=bool(history)):
-        if history:
-            for item in reversed(history[-5:]):
-                st.caption(truncate_text(item["text"]))
-                st.write(
-                    f"{format_rating(item['rating'])} dari 5 - {item['interpretation']}"
-                )
-        else:
-            st.caption("Belum ada prediksi pada sesi ini.")
-
-    st.button(
-        "Hapus Semua Data Sesi",
-        on_click=clear_session_history,
-        use_container_width=True,
-    )
 
 st.title("Prediksi Rating Ulasan Pelanggan Lazada Indonesia")
 st.markdown(
@@ -293,6 +160,19 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
+
+st.write("Contoh ulasan siap coba:")
+example_columns = st.columns(3)
+example_labels = ["Ulasan positif", "Ulasan biasa", "Ulasan negatif"]
+
+for column, label, example in zip(example_columns, example_labels, EXAMPLE_REVIEWS):
+    with column:
+        st.button(
+            label,
+            on_click=select_example,
+            args=(example,),
+            use_container_width=True,
+        )
 
 review_text = st.text_area("Masukkan teks ulasan", key="review_text")
 
@@ -321,11 +201,6 @@ if predict_clicked:
             prediction = float(model_knn.predict(features)[0])
             st.session_state.prediction = prediction
             st.session_state.interpretation = interpret_rating(prediction)
-            add_prediction_history(
-                review_text,
-                prediction,
-                st.session_state.interpretation,
-            )
 
 if st.session_state.message:
     st.warning(st.session_state.message)
