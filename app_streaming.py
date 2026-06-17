@@ -11,8 +11,8 @@ VECTORIZER_PATH = BASE_DIR / "model" / "tfidf_vectorizer.joblib"
 
 EXAMPLE_REVIEWS = [
     "Barang sangat bagus, kualitas mantap dan sesuai pesanan!",
-    "Produknya lumayan dan sesuai dengan harga.",
-    "Barang rusak, pengiriman lama dan sangat mengecewakan.",
+    "Kualitas kurang bagus, barang biasa saja, pengiriman lama.",
+    "Kualitas sangat buruk, barang rusak, tidak sesuai deskripsi.",
 ]
 
 INTERPRETATION_STYLES = {
